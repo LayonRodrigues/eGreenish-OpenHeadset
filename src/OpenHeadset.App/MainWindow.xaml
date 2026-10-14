@@ -1,0 +1,155 @@
+﻿<Window x:Class="OpenHeadset.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OpenHeadset.App"
+        Title="eGreenish OpenHeadset" Icon="Assets/OpenHeadset.ico"
+        Width="404" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType">
+
+    <Border Margin="14" CornerRadius="20" Background="{StaticResource WindowBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+            TextElement.Foreground="{StaticResource TextBrush}">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.55" Color="Black"/>
+        </Border.Effect>
+
+        <StackPanel Margin="20,16,20,18">
+
+            <!-- Cabeçalho: arrastar por aqui. -->
+            <Grid MouseLeftButtonDown="Header_MouseLeftButtonDown" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Width="42" Height="42" CornerRadius="12" VerticalAlignment="Top"
+                        Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1">
+                    <local:Icon Data="{StaticResource Icon.Headphones}" Width="24" Height="24"
+                                Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="12,1,8,0">
+                    <TextBlock Text="{Binding HeadsetName}" FontSize="16" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Ellipse Width="8" Height="8" Margin="0,1,7,0" VerticalAlignment="Top"
+                                 Fill="{Binding IsConnected, Converter={StaticResource StatusBrush}}"/>
+                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource Caption}" MaxWidth="250"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Style="{StaticResource IconButton}" Click="Minimize_Click"
+                            ToolTip="Minimizar" AutomationProperties.Name="Minimizar">
+                        <local:Icon Data="{StaticResource Icon.Minus}" Width="18" Height="18"/>
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Click="Hide_Click"
+                            ToolTip="Fechar para a bandeja (o app continua rodando)"
+                            AutomationProperties.Name="Fechar para a bandeja">
+                        <local:Icon Data="{StaticResource Icon.Close}" Width="18" Height="18"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Bateria -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0"
+                    Visibility="{Binding HasBattery, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <local:Icon Data="{Binding BatteryPercent, Converter={StaticResource BatteryIcon}}"
+                                    Width="18" Height="18" Foreground="{StaticResource MutedBrush}"/>
+                        <TextBlock Text="Bateria" Style="{StaticResource Caption}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding BatteryText}" FontSize="40" FontWeight="Light" Margin="0,4,0,10"
+                               TextWrapping="NoWrap"/>
+                    <ProgressBar Style="{StaticResource BatteryBar}" Value="{Binding BatteryPercent, Mode=OneWay, TargetNullValue=0}"
+                                 AutomationProperties.Name="Nível da bateria"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Controle de ruído: modos e níveis vêm do perfil do fone. -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasNoise, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Controle de ruído" Style="{StaticResource Caption}"/>
+
+                    <Border Background="{StaticResource WindowBrush}" CornerRadius="12" Padding="3" Margin="0,10,0,0">
+                        <ItemsControl ItemsSource="{Binding Modes}" KeyboardNavigation.TabNavigation="Continue">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource Segment}"
+                                            Command="{Binding DataContext.SelectModeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding Mode}"
+                                            Tag="{Binding IsSelected}"
+                                            AutomationProperties.Name="{Binding AutomationName}">
+                                        <StackPanel>
+                                            <local:Icon Data="{Binding Icon}" Width="22" Height="22" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Label}" Margin="0,6,0,0" HorizontalAlignment="Center" TextWrapping="NoWrap"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <StackPanel Visibility="{Binding ShowLevels, Converter={StaticResource BoolToVisibility}}" Margin="0,14,0,0">
+                        <TextBlock Text="Intensidade" Style="{StaticResource Caption}"/>
+                        <Border Background="{StaticResource WindowBrush}" CornerRadius="12" Padding="3" Margin="0,10,0,0">
+                            <ItemsControl ItemsSource="{Binding Levels}" KeyboardNavigation.TabNavigation="Continue">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource Segment}" Content="{Binding Label}" FontSize="12" Padding="4,10"
+                                                Command="{Binding DataContext.SelectLevelCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding Id}"
+                                                Tag="{Binding IsSelected}"
+                                                AutomationProperties.Name="{Binding AutomationName}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Modo jogo -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasGameMode, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <local:Icon Grid.Column="0" Data="{StaticResource Icon.Gamepad}" Width="24" Height="24"
+                                Margin="0,0,12,0" Foreground="{StaticResource AccentBrush}"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Modo jogo" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="Reduz o atraso do áudio" Style="{StaticResource Caption}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Style="{StaticResource Switch}"
+                            Command="{Binding ToggleGameModeCommand}" Tag="{Binding GameMode}"
+                            AutomationProperties.Name="Alternar modo jogo"/>
+                </Grid>
+            </Border>
+
+            <TextBlock Text="{Binding Feedback}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="2,12,0,0"
+                       Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVisibility}}"/>
+
+            <TextBlock Style="{StaticResource Caption}" Margin="2,14,0,0" FontSize="11"
+                       Text="eGreenish OpenHeadset · projeto independente e de código aberto, sem vínculo com o fabricante do fone."/>
+        </StackPanel>
+    </Border>
+</Window>

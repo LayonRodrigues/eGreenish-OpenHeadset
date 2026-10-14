@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build OpenHeadset.slnx -c Release
+
+      # Só testes sem hardware: bytes capturados e o contrato de perfis.
+      - name: Test
+        run: dotnet test tests/OpenHeadset.Tests -c Release --no-build

@@ -1,0 +1,54 @@
+name: Headset support request
+description: Ask for support for a headset, or offer a capture to help add it
+labels: ["new headset"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Before you post, please read the rules in [CONTRIBUTING.md](https://github.com/LayonRodrigues/eGreenish-OpenHeadset/blob/main/CONTRIBUTING.md).
+        **Do not paste decompiled vendor code, keys, firmware or the vendor's assets.** Describe what you observed.
+  - type: input
+    id: model
+    attributes:
+      label: Headset brand and model
+      description: Exactly as the Bluetooth name appears in Windows.
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version (if you know it)
+  - type: dropdown
+    id: port
+    attributes:
+      label: Does it show up in `probe list` with a COM port?
+      description: Run `dotnet run --project tools/OpenHeadset.Probe -- list` with the headset paired.
+      options:
+        - "Yes, it has a COM port"
+        - "No, it does not appear (probably BLE only)"
+        - "I did not try"
+    validations:
+      required: true
+  - type: checkboxes
+    id: wants
+    attributes:
+      label: What do you want to control?
+      options:
+        - label: Battery level
+        - label: Noise control (off / ANC / transparency)
+        - label: Game / low latency mode
+        - label: Equalizer
+        - label: Other (describe below)
+  - type: textarea
+    id: capture
+    attributes:
+      label: Capture or notes (optional)
+      description: Output of `probe listen` / `probe send`, or what you observed. Bytes only, no vendor code or keys.
+      render: text
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Can you help test?
+      options:
+        - label: I own this headset and can test changes on it
+        - label: I can write the profile myself

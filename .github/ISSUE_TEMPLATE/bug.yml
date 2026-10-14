@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work with a supported headset
+labels: ["bug"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Headset model
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: From the release name or the zip file you downloaded.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: For example Windows 10 22H2 or Windows 11 24H2.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (if any)
+      description: "`%LOCALAPPDATA%\\OpenHeadset\\errors.log`, if the file exists."
+      render: text
