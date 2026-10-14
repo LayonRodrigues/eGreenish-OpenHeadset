@@ -38,8 +38,8 @@ public partial class App : Application
         _window = new MainWindow(new MainViewModel(_session, Dispatcher));
         _tray = CreateTray();
 
+        _window.PlaceNearTray(); // antes de mostrar, para abrir já no canto e sem pular
         _window.Show();
-        _window.PlaceNearTray();
         _session.Start();
     }
 
@@ -80,10 +80,10 @@ public partial class App : Application
         if (_window is null)
             return;
 
-        _window.Show();
         if (_window.WindowState == WindowState.Minimized)
             _window.WindowState = WindowState.Normal;
         _window.PlaceNearTray();
+        _window.Show();
         _window.Activate();
     }
 

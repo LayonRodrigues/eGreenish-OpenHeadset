@@ -23,8 +23,11 @@ public sealed record CommandResult(bool Ok, string Message);
 public sealed class HeadsetSession : IDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan RetryAfterTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(3);
-    private const int MaxConsecutiveTimeouts = 3;
+
+    // Duas leituras seguidas sem resposta bastam para considerar a conexão perdida (cerca de 7 s no total).
+    private const int MaxConsecutiveTimeouts = 2;
 
     private readonly IReadOnlyList<HeadsetProfile> _profiles;
     private readonly CancellationTokenSource _cts = new();
@@ -33,7 +36,14 @@ public sealed class HeadsetSession : IDisposable
     private volatile ActiveConnection? _active;
     private Task? _runner;
 
-    private sealed record ActiveConnection(HeadsetLink Link, IHeadsetProtocol Protocol);
+    private sealed class ActiveConnection(HeadsetLink link, IHeadsetProtocol protocol)
+    {
+        public HeadsetLink Link { get; } = link;
+        public IHeadsetProtocol Protocol { get; } = protocol;
+
+        /// <summary>Completa quando algo mostra que esta conexão não funciona mais (comando sem resposta, falha de E/S).</summary>
+        public TaskCompletionSource Lost { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     public HeadsetSession(IReadOnlyList<HeadsetProfile> profiles)
     {
@@ -81,11 +91,14 @@ public sealed class HeadsetSession : IDisposable
         }
         catch (TimeoutException)
         {
-            return new CommandResult(false, "O fone não respondeu ao comando.");
+            // Um comando sem resposta indica conexão morta: pede a reconexão em vez de esperar a próxima consulta.
+            active.Lost.TrySetResult();
+            return new CommandResult(false, "O fone não respondeu ao comando. Reconectando…");
         }
         catch (Exception e) when (e is IOException or OperationCanceledException or InvalidOperationException)
         {
-            return new CommandResult(false, "A conexão com o fone caiu durante o comando.");
+            active.Lost.TrySetResult();
+            return new CommandResult(false, "A conexão com o fone caiu durante o comando. Reconectando…");
         }
     }
 
@@ -102,7 +115,7 @@ public sealed class HeadsetSession : IDisposable
                 if (found is null)
                 {
                     Publish(ConnectionStatus.Searching,
-                        "Nenhum fone compatível encontrado. Pareie o fone nas configurações de Bluetooth do Windows.", null, null);
+                        "Nenhum fone compatível encontrado. Ligue o fone ou pareie-o nas configurações de Bluetooth do Windows.", null, null);
                     await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
                     continue;
                 }
@@ -157,6 +170,7 @@ public sealed class HeadsetSession : IDisposable
         var timeouts = 0;
         while (!ct.IsCancellationRequested)
         {
+            var wait = PollInterval;
             try
             {
                 var state = await ReadStateAsync(active, ct).ConfigureAwait(false);
@@ -165,7 +179,9 @@ public sealed class HeadsetSession : IDisposable
             }
             catch (TimeoutException) when (++timeouts < MaxConsecutiveTimeouts)
             {
-                // Uma falha isolada não derruba a conexão.
+                // Uma falha isolada não derruba a conexão, mas a interface não deve continuar dizendo "Conectado".
+                Publish(ConnectionStatus.Connecting, "O fone não está respondendo…", headset, Snapshot.State);
+                wait = RetryAfterTimeout;
             }
             catch (Exception e) when (e is TimeoutException or IOException)
             {
@@ -176,11 +192,12 @@ public sealed class HeadsetSession : IDisposable
             using var iteration = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var wake = await Task.WhenAny(
                 _refreshRequests.Reader.WaitToReadAsync(iteration.Token).AsTask(),
-                Task.Delay(PollInterval, iteration.Token),
-                closed.Task).ConfigureAwait(false);
+                Task.Delay(wait, iteration.Token),
+                closed.Task,
+                active.Lost.Task).ConfigureAwait(false);
             await iteration.CancelAsync().ConfigureAwait(false);
 
-            if (wake == closed.Task)
+            if (wake == closed.Task || wake == active.Lost.Task)
             {
                 Publish(ConnectionStatus.Connecting, "Conexão com o fone perdida. Reconectando…", headset, null);
                 return;

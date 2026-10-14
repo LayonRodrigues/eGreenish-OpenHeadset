@@ -1,4 +1,3 @@
-using System.IO.Ports;
 using OpenHeadset.Core;
 
 namespace OpenHeadset.Transport;
@@ -6,11 +5,16 @@ namespace OpenHeadset.Transport;
 /// <summary>
 /// Conexão serial com o fone. Não conhece nenhum protocolo: recebe um <see cref="IMessageParser"/>
 /// e trabalha com <see cref="ProtocolRequest"/>. Toda E/S acontece fora da thread de interface.
-/// Aceita uma requisição por vez; mensagens que não são resposta ao pedido em curso só são repassadas por evento.
+/// Aceita uma requisição por vez.
 /// </summary>
+/// <remarks>
+/// Todo pedido tem prazo, inclusive a espera pela vez e a escrita. Uma porta Bluetooth cujo fone foi desligado
+/// pode deixar a escrita bloqueada sem limite; sem prazo ali, um pedido preso seguraria a fila para sempre
+/// e o aplicativo nunca perceberia que a conexão caiu.
+/// </remarks>
 public sealed class HeadsetLink : IDisposable
 {
-    private readonly SerialPort _port;
+    private readonly ISerialChannel _channel;
     private readonly IMessageParser _parser;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _pendingLock = new();
@@ -25,33 +29,37 @@ public sealed class HeadsetLink : IDisposable
     /// <summary>Disparado uma vez quando a conexão cai.</summary>
     public event Action<string>? Closed;
 
-    private HeadsetLink(SerialPort port, IMessageParser parser)
+    internal HeadsetLink(ISerialChannel channel, IMessageParser parser)
     {
-        _port = port;
+        _channel = channel;
         _parser = parser;
+        _ = Task.Run(ReadLoop);
     }
 
     /// <summary>Abre a porta. Lança <see cref="IOException"/> ou <see cref="UnauthorizedAccessException"/> se o fone estiver desligado ou a porta ocupada.</summary>
-    public static HeadsetLink Open(string portName, SerialSettings settings, IMessageParser parser)
-    {
-        var port = new SerialPort(portName, settings.BaudRate)
-        {
-            ReadTimeout = 500,
-            WriteTimeout = 3000,
-            DtrEnable = true,
-            RtsEnable = true,
-        };
-        port.Open();
+    public static HeadsetLink Open(string portName, SerialSettings settings, IMessageParser parser) =>
+        new(SerialPortChannel.Open(portName, settings.BaudRate), parser);
 
-        var link = new HeadsetLink(port, parser);
-        _ = Task.Run(link.ReadLoop);
-        return link;
-    }
-
-    /// <summary>Envia o pedido e espera a mensagem que o protocolo reconhece como resposta.</summary>
+    /// <summary>
+    /// Envia o pedido e espera a mensagem que o protocolo reconhece como resposta. O prazo vale para o total
+    /// (esperar a vez, escrever e esperar a resposta). Sem resposta: <see cref="TimeoutException"/>.
+    /// Se não for possível nem escrever, a conexão é considerada perdida e é fechada.
+    /// </summary>
     public async Task<object> RequestAsync(ProtocolRequest request, TimeSpan timeout, CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct, _cts.Token);
+        deadline.CancelAfter(timeout);
+
+        try
+        {
+            await _gate.WaitAsync(deadline.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            ThrowIfClosed();
+            throw new TimeoutException("Outro pedido está preso; esta conexão provavelmente caiu.");
+        }
+
         try
         {
             var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -61,25 +69,15 @@ public sealed class HeadsetLink : IDisposable
                 _pendingMatch = request.IsReply;
             }
 
-            try
-            {
-                await _port.BaseStream.WriteAsync(request.Frame, ct).ConfigureAwait(false);
-                await _port.BaseStream.FlushAsync(ct).ConfigureAwait(false);
-            }
-            catch (Exception e) when (e is IOException or TimeoutException or InvalidOperationException)
-            {
-                Close($"Falha ao enviar: {e.Message}");
-                throw;
-            }
+            await WriteAsync(request.Frame, deadline.Token, ct).ConfigureAwait(false);
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _cts.Token);
-            timeoutCts.CancelAfter(timeout);
             try
             {
-                return await tcs.Task.WaitAsync(timeoutCts.Token).ConfigureAwait(false);
+                return await tcs.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
+                ThrowIfClosed();
                 throw new TimeoutException($"O fone não respondeu em {timeout.TotalSeconds:0.#} s.");
             }
         }
@@ -94,6 +92,34 @@ public sealed class HeadsetLink : IDisposable
         }
     }
 
+    /// <summary>A escrita roda fora da thread de quem chamou e é abandonada se passar do prazo.</summary>
+    private async Task WriteAsync(byte[] frame, CancellationToken deadline, CancellationToken callerToken)
+    {
+        var write = Task.Run(() => _channel.Write(frame, 0, frame.Length));
+        try
+        {
+            await write.WaitAsync(deadline).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!callerToken.IsCancellationRequested)
+        {
+            // Escrita travada: a porta está morta. Fechar a libera e faz a Task terminar com erro, que é ignorado.
+            _ = write.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            Close("O fone não aceitou o envio (conexão perdida).");
+            throw new TimeoutException("O fone não aceitou o envio; a conexão foi considerada perdida.");
+        }
+        catch (Exception e) when (e is IOException or TimeoutException or InvalidOperationException or ObjectDisposedException)
+        {
+            Close($"Falha ao enviar: {e.Message}");
+            throw;
+        }
+    }
+
+    private void ThrowIfClosed()
+    {
+        if (Volatile.Read(ref _closed) == 1)
+            throw new IOException("A conexão com o fone foi encerrada.");
+    }
+
     private void ReadLoop()
     {
         var buffer = new byte[512];
@@ -103,7 +129,7 @@ public sealed class HeadsetLink : IDisposable
         {
             try
             {
-                var n = _port.BaseStream.Read(buffer, 0, buffer.Length);
+                var n = _channel.Read(buffer, 0, buffer.Length);
                 if (n == 0)
                 {
                     Close("O fone encerrou a conexão.");
@@ -151,11 +177,7 @@ public sealed class HeadsetLink : IDisposable
             _pending?.TrySetException(new IOException(reason));
 
         // Fechar uma porta BT que sumiu pode bloquear; faz fora da thread de quem chamou.
-        _ = Task.Run(() =>
-        {
-            try { _port.Close(); } catch { /* já caiu */ }
-            try { _port.Dispose(); } catch { /* idem */ }
-        });
+        _ = Task.Run(_channel.Dispose);
 
         Closed?.Invoke(reason);
     }
