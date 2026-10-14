@@ -27,7 +27,8 @@ tries other commands. The window is currently in Portuguese; translations are we
 
 1. Pair the headset in the Windows Bluetooth settings and connect it.
 2. Run `OpenHeadset.exe`. The window finds a supported headset and shows its state.
-3. The close button hides the window to the tray. Use the tray menu to quit.
+3. The close button hides the window to the tray. Use the tray menu to quit. Opening the app again brings the window back.
+4. Optional: turn on the *Iniciar com o Windows* switch (start with Windows) to launch it at sign-in, straight to the tray with no window. It is off by default and only touches your own user account.
 
 Windows 10 or later, x64. The download is self-contained: no .NET install is needed.
 

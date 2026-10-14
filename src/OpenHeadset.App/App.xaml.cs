@@ -47,14 +47,30 @@ public partial class App : Application
             args.Handled = true;
         };
 
+        var startup = new StartupRegistration("eGreenish OpenHeadset");
+        try
+        {
+            if (Environment.ProcessPath is { } exe)
+                startup.RefreshPath(exe); // só conserta se o executável registrado sumiu
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            // Sem acesso ao registro: o início automático simplesmente não é ajustado.
+        }
+
         _session = new HeadsetSession(BuiltInProfiles.All);
         _session.Faulted += LogError;
-        _window = new MainWindow(new MainViewModel(_session, Dispatcher));
+        _window = new MainWindow(new MainViewModel(_session, Dispatcher, startup));
         _tray = CreateTray();
         ListenForShowSignal();
 
         _window.PlaceNearTray(); // antes de mostrar, para abrir já no canto e sem pular
-        _window.Show();
+
+        // Iniciado pelo Windows (--tray): fica só na bandeja. A janela aparece ao clicar no ícone ou ao abrir o atalho.
+        var startHidden = e.Args.Contains(StartupRegistration.TrayArgument, StringComparer.OrdinalIgnoreCase);
+        if (!startHidden)
+            _window.Show();
+
         _session.Start();
     }
 

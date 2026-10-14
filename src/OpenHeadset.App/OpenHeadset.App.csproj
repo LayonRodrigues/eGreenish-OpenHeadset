@@ -9,7 +9,7 @@
     <AssemblyName>OpenHeadset</AssemblyName>
     <RootNamespace>OpenHeadset.App</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Product>eGreenish OpenHeadset</Product>
     <ApplicationIcon>Assets\OpenHeadset.ico</ApplicationIcon>
   </PropertyGroup>

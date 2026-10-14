@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -44,6 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
     };
 
     private readonly HeadsetSession _session;
+    private readonly StartupRegistration _startup;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _feedbackTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private string? _profileId;
@@ -78,6 +80,9 @@ public sealed partial class MainViewModel : ObservableObject
     private string _feedback = "";
 
     [ObservableProperty]
+    private bool _startWithWindows;
+
+    [ObservableProperty]
     private bool _hasBattery;
 
     [ObservableProperty]
@@ -90,10 +95,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ObservableCollection<LevelItem> Levels { get; } = [];
 
-    public MainViewModel(HeadsetSession session, Dispatcher dispatcher)
+    public MainViewModel(HeadsetSession session, Dispatcher dispatcher, StartupRegistration startup)
     {
         _session = session;
         _dispatcher = dispatcher;
+        _startup = startup;
+        _startWithWindows = SafeIsEnabled(startup);
         _feedbackTimer.Tick += (_, _) => { _feedbackTimer.Stop(); Feedback = ""; };
 
         _session.Changed += snapshot => _dispatcher.InvokeAsync(() => Apply(snapshot));
@@ -182,6 +189,31 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task SelectLevelAsync(string levelId) =>
         RunAsync(() => _session.SetNoiseAsync(new NoiseSetting(NoiseMode.Anc, levelId)));
+
+    [RelayCommand]
+    private void ToggleStartWithWindows()
+    {
+        try
+        {
+            if (StartWithWindows)
+                _startup.Disable();
+            else
+                _startup.Enable(Environment.ProcessPath ?? throw new InvalidOperationException("Caminho do aplicativo desconhecido."));
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or InvalidOperationException or IOException)
+        {
+            ShowFeedback("Não consegui mudar o início com o Windows.");
+        }
+
+        // Relê do registro: o interruptor mostra o que de fato ficou gravado, não o que se tentou gravar.
+        StartWithWindows = SafeIsEnabled(_startup);
+    }
+
+    private static bool SafeIsEnabled(StartupRegistration startup)
+    {
+        try { return startup.IsEnabled(); }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException) { return false; }
+    }
 
     [RelayCommand]
     private Task ToggleGameModeAsync() =>

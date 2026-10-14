@@ -145,6 +145,21 @@
                 </Grid>
             </Border>
 
+            <!-- Início com o Windows: independe do fone, por isso fica fora dos cartões que dependem dele. -->
+            <Grid Margin="4,16,2,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Iniciar com o Windows" FontSize="13"/>
+                    <TextBlock Text="Abre direto na bandeja, sem mostrar a janela" Style="{StaticResource Caption}" FontSize="11" Margin="0,2,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource Switch}"
+                        Command="{Binding ToggleStartWithWindowsCommand}" Tag="{Binding StartWithWindows}"
+                        AutomationProperties.Name="Alternar início com o Windows"/>
+            </Grid>
+
             <TextBlock Text="{Binding Feedback}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="2,12,0,0"
                        Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVisibility}}"/>
 

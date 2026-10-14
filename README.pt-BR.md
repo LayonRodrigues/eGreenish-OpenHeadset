@@ -27,7 +27,8 @@ comandos. A janela está em português por enquanto; traduções são bem-vindas
 
 1. Pareie o fone nas configurações de Bluetooth do Windows e conecte.
 2. Abra o `OpenHeadset.exe`. A janela encontra um fone suportado e mostra o estado.
-3. O botão de fechar esconde a janela na bandeja. Para sair, use o menu da bandeja.
+3. O botão de fechar esconde a janela na bandeja. Para sair, use o menu da bandeja. Abrir o app de novo traz a janela de volta.
+4. Opcional: ligue o interruptor *Iniciar com o Windows* para o app abrir ao entrar no Windows, direto na bandeja e sem janela. Vem desligado e só mexe na sua própria conta de usuário.
 
 Windows 10 ou superior, x64. O download é autocontido: não precisa instalar o .NET.
 
