@@ -97,7 +97,7 @@ public class HeadsetLinkTests
 
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), "Deveria falhar perto do prazo, não esperar a escrita.");
         Assert.Contains("conexão", ex.Message);
-        Assert.True(closed.Task.Wait(TimeSpan.FromSeconds(2)), "A conexão deveria ter sido marcada como perdida.");
+        await Within(closed.Task, TimeSpan.FromSeconds(2)); // falha com "travou" se a conexão não foi marcada como perdida
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class HeadsetLinkTests
 
         await Assert.ThrowsAsync<IOException>(() => Within(link.RequestAsync(Request(1), TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(3)));
 
-        Assert.True(closed.Task.Wait(TimeSpan.FromSeconds(2)));
+        await Within(closed.Task, TimeSpan.FromSeconds(2));
     }
 
     [Fact]

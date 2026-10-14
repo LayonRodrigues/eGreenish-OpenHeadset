@@ -53,6 +53,9 @@ public sealed class HeadsetSession : IDisposable
 
     public event Action<SessionSnapshot>? Changed;
 
+    /// <summary>Falha inesperada no laço da sessão. A sessão registra e tenta de novo; quem assina decide como guardar o erro.</summary>
+    public event Action<Exception>? Faulted;
+
     public SessionSnapshot Snapshot { get; private set; }
 
     public void Start() => _runner ??= Task.Run(() => RunAsync(_cts.Token));
@@ -151,6 +154,21 @@ public sealed class HeadsetSession : IDisposable
             catch (OperationCanceledException)
             {
                 return;
+            }
+            catch (Exception e)
+            {
+                // Qualquer outra falha (ex.: o Windows recusar a consulta de dispositivos) não pode matar o laço
+                // de reconexão em silêncio: registra, avisa na tela e tenta de novo.
+                Faulted?.Invoke(e);
+                Publish(ConnectionStatus.Connecting, "Erro inesperado. Tentando de novo…", null, null);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }
     }
