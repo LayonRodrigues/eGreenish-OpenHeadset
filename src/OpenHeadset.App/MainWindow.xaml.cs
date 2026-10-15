@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace OpenHeadset.App;
@@ -16,8 +17,25 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // Com todos os cartões a janela passa da altura da tela: limita e deixa o conteúdo rolar.
+        MaxHeight = SystemParameters.WorkArea.Height - 2 * EdgeGap + 2 * ShadowMargin;
+
         // A altura muda sozinha (os cartões aparecem ao conectar). Sem reposicionar, a janela cresceria para fora da tela.
         SizeChanged += (_, _) => KeepOnScreen();
+    }
+
+    // Só a escolha feita com a lista aberta vira comando. Quando a leitura do fone muda o valor, a lista está
+    // fechada e nada é enviado de volta.
+    private void EqPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { IsDropDownOpen: true, SelectedValue: int presetId } && DataContext is MainViewModel vm)
+            _ = vm.SelectEqPresetAsync(presetId);
+    }
+
+    private void ButtonFunction_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { IsDropDownOpen: true, SelectedValue: int code, Tag: ButtonRow row } && DataContext is MainViewModel vm)
+            _ = vm.SelectButtonFunctionAsync(row, code);
     }
 
     /// <summary>Encosta a janela no canto inferior direito da área útil, perto da bandeja, e a mantém lá se ela mudar de altura.</summary>

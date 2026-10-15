@@ -33,6 +33,32 @@ public sealed partial class LevelItem(string id, string label) : ObservableObjec
     private bool _isSelected;
 }
 
+/// <summary>Uma opção da lista de funções de um gesto.</summary>
+public sealed record FunctionOption(int Code, string Label);
+
+/// <summary>Uma linha de "Atalhos dos botões": um gesto e a função que o fone tem atribuída a ele.</summary>
+public sealed partial class ButtonRow(int slot, string label, IEnumerable<FunctionOption> options) : ObservableObject
+{
+    public int Slot { get; } = slot;
+    public string Label { get; } = label;
+    public string AutomationName { get; } = $"Função do gesto {label.ToLowerInvariant()}";
+    public ObservableCollection<FunctionOption> Options { get; } = new(options);
+
+    [ObservableProperty]
+    private int _code = -1;
+
+    /// <summary>Mostra o código que o fone informou. Um código fora da lista (o fone usa alguns) ganha uma opção própria, para não ser apagado.</summary>
+    public void Show(int code)
+    {
+        if (Options.All(o => o.Code != code))
+            Options.Add(new FunctionOption(code, $"Outra ({code})"));
+        Code = code;
+    }
+
+    /// <summary>Força a lista a voltar ao valor do fone depois de uma escolha que o fone não aceitou.</summary>
+    public void Refresh() => OnPropertyChanged(nameof(Code));
+}
+
 public sealed partial class MainViewModel : ObservableObject
 {
     // Rótulos em português para os níveis conhecidos; um perfil novo cai no rótulo dele.
@@ -91,6 +117,42 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasGameMode;
 
+    [ObservableProperty]
+    private bool _hasDualLink;
+
+    [ObservableProperty]
+    private bool _dualLink;
+
+    [ObservableProperty]
+    private bool _hasHighQuality;
+
+    [ObservableProperty]
+    private bool _highQuality;
+
+    [ObservableProperty]
+    private bool _hasSpatialAudio;
+
+    [ObservableProperty]
+    private bool _spatialAudio;
+
+    [ObservableProperty]
+    private bool _hasEqualizer;
+
+    /// <summary>Id do preset que o fone informou (-1: ainda não lido).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EqPresetLabel))]
+    private int _eqPresetId = -1;
+
+    /// <summary>Nome do preset ativo, para o cabeçalho do acordeão (vazio se ainda não lido).</summary>
+    public string EqPresetLabel => EqPresets.FirstOrDefault(p => p.Id == EqPresetId)?.Label ?? "";
+
+    [ObservableProperty]
+    private bool _hasButtonMapping;
+
+    public ObservableCollection<EqPreset> EqPresets { get; } = [];
+
+    public ObservableCollection<ButtonRow> ButtonRows { get; } = [];
+
     public ObservableCollection<ModeItem> Modes { get; } = [];
 
     public ObservableCollection<LevelItem> Levels { get; } = [];
@@ -127,6 +189,11 @@ public sealed partial class MainViewModel : ObservableObject
             BatteryPercent = state.BatteryPercent;
             Mode = state.Noise?.Mode;
             GameMode = state.GameMode ?? false;
+            DualLink = state.DualLink ?? false;
+            HighQuality = state.HighQuality ?? false;
+            SpatialAudio = state.SpatialAudio ?? false;
+            EqPresetId = state.EqPreset ?? -1;
+            ShowButtons(state.Buttons);
             MarkSelection(state.Noise);
         }
         else if (!IsConnected)
@@ -147,6 +214,23 @@ public sealed partial class MainViewModel : ObservableObject
         HasBattery = profile?.Capabilities.HasFlag(Capabilities.Battery) ?? false;
         HasNoise = profile?.Capabilities.HasFlag(Capabilities.NoiseControl) ?? false;
         HasGameMode = profile?.Capabilities.HasFlag(Capabilities.GameMode) ?? false;
+        HasDualLink = profile?.Capabilities.HasFlag(Capabilities.DualLink) ?? false;
+        HasHighQuality = profile?.Capabilities.HasFlag(Capabilities.HighQuality) ?? false;
+        HasSpatialAudio = profile?.Capabilities.HasFlag(Capabilities.SpatialAudio) ?? false;
+        HasEqualizer = profile?.Capabilities.HasFlag(Capabilities.Equalizer) ?? false;
+        HasButtonMapping = profile?.Capabilities.HasFlag(Capabilities.ButtonMapping) ?? false;
+
+        EqPresets.Clear();
+        foreach (var preset in profile?.EqPresets ?? [])
+            EqPresets.Add(preset);
+
+        ButtonRows.Clear();
+        if (HasButtonMapping)
+        {
+            var functions = (profile?.ButtonFunctions ?? []).Select(f => new FunctionOption(f.Code, f.Label)).ToList();
+            foreach (var gesture in profile?.ButtonGestures ?? [])
+                ButtonRows.Add(new ButtonRow(gesture.Slot, gesture.Label, functions));
+        }
 
         Modes.Clear();
         Levels.Clear();
@@ -218,6 +302,42 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task ToggleGameModeAsync() =>
         RunAsync(() => _session.SetGameModeAsync(!GameMode));
+
+    [RelayCommand]
+    private Task ToggleDualLinkAsync() =>
+        RunAsync(() => _session.SetDualLinkAsync(!DualLink));
+
+    [RelayCommand]
+    private Task ToggleHighQualityAsync() =>
+        RunAsync(() => _session.SetHighQualityAsync(!HighQuality));
+
+    [RelayCommand]
+    private Task ToggleSpatialAudioAsync() =>
+        RunAsync(() => _session.SetSpatialAudioAsync(!SpatialAudio));
+
+    public async Task SelectEqPresetAsync(int presetId)
+    {
+        await RunAsync(() => _session.SetEqPresetAsync(presetId));
+        OnPropertyChanged(nameof(EqPresetId)); // se o fone recusou, a lista volta ao preset dele
+    }
+
+    public async Task SelectButtonFunctionAsync(ButtonRow row, int functionCode)
+    {
+        await RunAsync(() => _session.SetButtonAsync(row.Slot, functionCode));
+        row.Refresh();
+    }
+
+    private void ShowButtons(IReadOnlyList<int>? codes)
+    {
+        if (codes is null)
+            return;
+
+        foreach (var row in ButtonRows)
+        {
+            if (row.Slot < codes.Count)
+                row.Show(codes[row.Slot]);
+        }
+    }
 
     private async Task RunAsync(Func<Task<CommandResult>> action)
     {

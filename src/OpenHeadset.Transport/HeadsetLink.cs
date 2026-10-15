@@ -141,7 +141,9 @@ public sealed class HeadsetLink : IDisposable
             }
             catch (TimeoutException)
             {
-                // Sem dados no intervalo: segue escutando.
+                // Sem dados no intervalo: o que sobrou no parser não vai mais crescer (ex.: quadro curto).
+                foreach (var message in _parser.Flush())
+                    Dispatch(message);
             }
             catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException or ObjectDisposedException)
             {

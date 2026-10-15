@@ -20,6 +20,20 @@ public class HeadsetLinkTests
         public void Reset() { }
     }
 
+    /// <summary>Segura os bytes e só os entrega no <see cref="Flush"/>, como um quadro curto que o cabeçalho não descreve.</summary>
+    private sealed class HoldUntilFlushParser : IMessageParser
+    {
+        private readonly List<byte> _held = [];
+        public IReadOnlyList<object> Feed(ReadOnlySpan<byte> data) { _held.AddRange(data.ToArray()); return []; }
+        public IReadOnlyList<object> Flush()
+        {
+            var message = _held.Count > 0 ? new object[] { _held.ToArray() } : [];
+            _held.Clear();
+            return message;
+        }
+        public void Reset() => _held.Clear();
+    }
+
     private static ProtocolRequest Request(byte id) => new([id], m => m is byte[] { Length: 1 } b && b[0] == id);
 
     /// <summary>Porta de mentira. O comportamento de escrita e de resposta é escolhido por teste.</summary>
@@ -81,6 +95,23 @@ public class HeadsetLinkTests
         var reply = await Within(link.RequestAsync(Request(7), TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(3));
 
         Assert.Equal(new byte[] { 7 }, Assert.IsType<byte[]>(reply));
+    }
+
+    [Fact]
+    public async Task A_reply_the_parser_only_completes_on_flush_still_answers_the_request()
+    {
+        // Regressão: a recusa do modo jogo era um quadro curto que o parser nunca completava; o pedido expirava
+        // e a sessão reconectava, o que o usuário via como "o botão não funciona".
+        var channel = new FakeChannel();
+        channel.OnWrite = frame => channel.Inject(frame[0]);
+        using var link = new HeadsetLink(channel, new HoldUntilFlushParser());
+        var closed = false;
+        link.Closed += _ => closed = true;
+
+        var reply = await Within(link.RequestAsync(Request(9), TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(3));
+
+        Assert.Equal(new byte[] { 9 }, Assert.IsType<byte[]>(reply));
+        Assert.False(closed);
     }
 
     [Fact]

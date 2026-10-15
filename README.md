@@ -1,7 +1,7 @@
 # eGreenish OpenHeadset
 
-A small Windows tray app to control Bluetooth headsets that have no desktop software: battery, noise control and
-game mode. **Open to any brand:** supporting a new headset means adding one profile, not rewriting the app.
+A small Windows tray app to control Bluetooth headsets that have no desktop software: battery, noise control, game
+mode and more. **Open to any brand:** supporting a new headset means adding one profile, not rewriting the app.
 
 [Leia em Português](README.pt-BR.md)
 
@@ -16,6 +16,12 @@ game mode. **Open to any brand:** supporting a new headset means adding one prof
 | Brand | Model | Battery | Noise control | Game mode | Tested on |
 |-------|-------|:-------:|:-------------:|:---------:|-----------|
 | UGREEN | HiTune Max5c | yes | off / ANC (4 levels) / ambient | yes | one unit, Windows 10 19045 |
+
+The HiTune Max5c profile also controls **dual link** (connect two devices at once), **Hi-Res decoding**, **spatial
+audio**, the **equalizer** (12 presets) and the **button shortcuts** (what tap, double tap, triple tap and long press
+do). Each of these was sent to a real headset and read back, with one exception: the shortcut functions use the codes
+from the manufacturer's app, and only play/pause was actually tried. On this headset, **Hi-Res decoding must be off**
+for game mode and dual link to be accepted; the headset refuses them otherwise and the app says so.
 
 Only what was verified on a real headset is listed. A control is sent only after it was seen to work, and the app
 reads the headset's answer back afterwards; if the headset does not confirm a change, the app tells you and never

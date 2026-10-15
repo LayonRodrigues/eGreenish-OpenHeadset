@@ -1,7 +1,7 @@
 # eGreenish OpenHeadset
 
-App pequeno de bandeja para Windows que controla fones Bluetooth sem software de desktop: bateria, controle de ruído
-e modo jogo. **Aberto a qualquer marca:** suportar um fone novo é acrescentar um perfil, não reescrever o app.
+App pequeno de bandeja para Windows que controla fones Bluetooth sem software de desktop: bateria, controle de ruído,
+modo jogo e mais. **Aberto a qualquer marca:** suportar um fone novo é acrescentar um perfil, não reescrever o app.
 
 [Read in English](README.md)
 
@@ -16,6 +16,12 @@ e modo jogo. **Aberto a qualquer marca:** suportar um fone novo é acrescentar u
 | Marca | Modelo | Bateria | Controle de ruído | Modo jogo | Testado em |
 |-------|--------|:-------:|:-----------------:|:---------:|------------|
 | UGREEN | HiTune Max5c | sim | desligado / ANC (4 níveis) / ambiente | sim | uma unidade, Windows 10 19045 |
+
+O perfil do HiTune Max5c também controla a **ligação dupla** (conectar dois aparelhos ao mesmo tempo), a **decodificação
+Hi-Res**, o **áudio espacial**, o **equalizador** (12 presets) e os **atalhos dos botões** (o que toque, toque duplo,
+triplo e longo fazem). Cada um foi enviado a um fone de verdade e lido de volta, com uma exceção: as funções dos atalhos
+usam os códigos do app do fabricante, e só o play/pause foi de fato testado. Neste fone, o **Hi-Res precisa estar
+desligado** para o modo jogo e a ligação dupla serem aceitos; ligado, o fone recusa os dois e o app avisa.
 
 Só entra na lista o que foi verificado num fone de verdade. Cada controle só é enviado depois de ser visto funcionando,
 e o app confere a resposta do fone em seguida; se o fone não confirmar a mudança, o app avisa e nunca tenta outros

@@ -15,6 +15,7 @@
             <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.55" Color="Black"/>
         </Border.Effect>
 
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20,16,20,18">
 
             <!-- Cabeçalho: arrastar por aqui. -->
@@ -145,6 +146,112 @@
                 </Grid>
             </Border>
 
+            <!-- Ligação dupla -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasDualLink, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Ligação dupla" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="Conecta o PC e o celular ao mesmo tempo" Style="{StaticResource Caption}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource Switch}"
+                            Command="{Binding ToggleDualLinkCommand}" Tag="{Binding DualLink}"
+                            AutomationProperties.Name="Alternar ligação dupla"/>
+                </Grid>
+            </Border>
+
+            <!-- Hi-Res: ligado, bloqueia modo jogo e ligação dupla neste fone. -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasHighQuality, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Áudio Hi-Res" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="Qualidade máxima. Desligue para usar modo jogo e ligação dupla"
+                                   Style="{StaticResource Caption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource Switch}"
+                            Command="{Binding ToggleHighQualityCommand}" Tag="{Binding HighQuality}"
+                            AutomationProperties.Name="Alternar áudio Hi-Res"/>
+                </Grid>
+            </Border>
+
+            <!-- Áudio espacial -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasSpatialAudio, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Áudio espacial" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="Som em volta da cabeça, em vez de dentro dela" Style="{StaticResource Caption}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource Switch}"
+                            Command="{Binding ToggleSpatialAudioCommand}" Tag="{Binding SpatialAudio}"
+                            AutomationProperties.Name="Alternar áudio espacial"/>
+                </Grid>
+            </Border>
+
+            <!-- Equalizador -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasEqualizer, Converter={StaticResource BoolToVisibility}}">
+                <Expander Style="{StaticResource Accordion}" AutomationProperties.Name="Equalizador">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Equalizador" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding EqPresetLabel}" Style="{StaticResource Caption}"
+                                       VerticalAlignment="Center" TextWrapping="NoWrap"/>
+                        </Grid>
+                    </Expander.Header>
+                    <ComboBox Style="{StaticResource Dropdown}"
+                              ItemsSource="{Binding EqPresets}" SelectedValuePath="Id"
+                              SelectedValue="{Binding EqPresetId, Mode=OneWay}"
+                              SelectionChanged="EqPreset_SelectionChanged"
+                              AutomationProperties.Name="Preset do equalizador"/>
+                </Expander>
+            </Border>
+
+            <!-- Atalhos dos botões: um gesto por linha. -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" IsEnabled="{Binding ControlsEnabled}"
+                    Visibility="{Binding HasButtonMapping, Converter={StaticResource BoolToVisibility}}">
+                <Expander Style="{StaticResource Accordion}" AutomationProperties.Name="Atalhos dos botões">
+                    <Expander.Header>
+                        <TextBlock Text="Gestos dos botões" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </Expander.Header>
+                    <ItemsControl ItemsSource="{Binding ButtonRows}" KeyboardNavigation.TabNavigation="Continue">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="190"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="13" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" Style="{StaticResource Dropdown}"
+                                              ItemsSource="{Binding Options}" SelectedValuePath="Code"
+                                              SelectedValue="{Binding Code, Mode=OneWay}" Tag="{Binding}"
+                                              SelectionChanged="ButtonFunction_SelectionChanged"
+                                              AutomationProperties.Name="{Binding AutomationName}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+            </Border>
+
             <!-- Início com o Windows: independe do fone, por isso fica fora dos cartões que dependem dele. -->
             <Grid Margin="4,16,2,0">
                 <Grid.ColumnDefinitions>
@@ -166,5 +273,6 @@
             <TextBlock Style="{StaticResource Caption}" Margin="2,14,0,0" FontSize="11"
                        Text="eGreenish OpenHeadset · projeto independente e de código aberto, sem vínculo com o fabricante do fone."/>
         </StackPanel>
+        </ScrollViewer>
     </Border>
 </Window>

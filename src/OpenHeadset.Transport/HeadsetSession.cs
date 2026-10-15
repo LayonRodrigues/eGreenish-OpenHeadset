@@ -70,6 +70,31 @@ public sealed class HeadsetSession : IDisposable
             (protocol, _) => protocol.SetGameMode(enabled),
             state => state.GameMode == enabled);
 
+    public Task<CommandResult> SetDualLinkAsync(bool enabled) =>
+        WriteAndVerifyAsync(
+            (protocol, _) => protocol.SetDualLink(enabled),
+            state => state.DualLink == enabled);
+
+    public Task<CommandResult> SetSpatialAudioAsync(bool enabled) =>
+        WriteAndVerifyAsync(
+            (protocol, _) => protocol.SetSpatialAudio(enabled),
+            state => state.SpatialAudio == enabled);
+
+    public Task<CommandResult> SetEqPresetAsync(int presetId) =>
+        WriteAndVerifyAsync(
+            (protocol, _) => protocol.SetEqPreset(presetId),
+            state => state.EqPreset == presetId);
+
+    public Task<CommandResult> SetButtonAsync(int slot, int functionCode) =>
+        WriteAndVerifyAsync(
+            (protocol, state) => protocol.SetButton(slot, functionCode, state),
+            state => state.Buttons is { } b && slot < b.Count && b[slot] == functionCode);
+
+    public Task<CommandResult> SetHighQualityAsync(bool enabled) =>
+        WriteAndVerifyAsync(
+            (protocol, _) => protocol.SetHighQuality(enabled),
+            state => state.HighQuality == enabled);
+
     private async Task<CommandResult> WriteAndVerifyAsync(
         Func<IHeadsetProtocol, HeadsetState?, ProtocolRequest?> build,
         Func<HeadsetState, bool> confirmed)
@@ -84,7 +109,10 @@ public sealed class HeadsetSession : IDisposable
 
         try
         {
-            await active.Link.RequestAsync(request, CommandTimeout, _cts.Token).ConfigureAwait(false);
+            var reply = await active.Link.RequestAsync(request, CommandTimeout, _cts.Token).ConfigureAwait(false);
+            if (request.IsAccepted is { } accepted && !accepted(reply))
+                return new CommandResult(false, request.RefusedMessage ?? "O fone recusou o comando. Algum outro recurso ligado pode estar bloqueando este.");
+
             var state = await ReadStateAsync(active, _cts.Token).ConfigureAwait(false);
             Publish(ConnectionStatus.Connected, "Conectado", Snapshot.Headset, state);
 

@@ -5,8 +5,13 @@ internal static class HituneCommand
 {
     public const byte Version = 1;
     public const byte DeviceState = 4;
+    public const byte Equalizer = 5;
+    public const byte DualLink = 6;
     public const byte GameMode = 8;
     public const byte NoiseControl = 9;
+    public const byte ButtonSetting = 10;
+    public const byte HighQuality = 11;
+    public const byte SpatialAudio = 18;
 }
 
 /// <summary>Resposta a um comando (cabeçalho DD EE FF).</summary>

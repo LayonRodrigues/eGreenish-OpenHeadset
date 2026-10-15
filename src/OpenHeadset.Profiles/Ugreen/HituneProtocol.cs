@@ -14,7 +14,19 @@ public sealed class HituneProtocol : IHeadsetProtocol
     // Posições dentro do payload do estado.
     private const int BatteryAt = 0;
     private const int NoiseAt = 3;
+    private const int EqAt = 4;
+    private const int DualLinkAt = 5;
     private const int GameModeAt = 6;
+    private const int HighQualityAt = 7;
+    private const int ButtonsAt = 8;
+    private const int SpatialAt = 20;
+
+    /// <summary>Gestos que o fone guarda (toque, duplo, triplo e longo de cada lado), mandados sempre todos juntos.</summary>
+    internal const int ButtonSlots = 8;
+
+    // Hi-Res ligado bloqueia modo jogo e ligação dupla (verificado: desligá-lo fez o fone aceitar os dois).
+    private const string RefusedByHiRes =
+        "O fone recusou. Desligue o áudio Hi-Res: ligado, ele bloqueia o modo jogo e a ligação dupla.";
 
     public IMessageParser CreateParser() => new HituneParser();
 
@@ -28,7 +40,15 @@ public sealed class HituneProtocol : IHeadsetProtocol
 
         var p = reply.Payload;
         int? battery = p[BatteryAt] <= 100 ? p[BatteryAt] : null;
-        return new HeadsetState(battery, DecodeNoise(p[NoiseAt]), p[GameModeAt] != 0);
+        return new HeadsetState(
+            battery,
+            DecodeNoise(p[NoiseAt]),
+            GameMode: p[GameModeAt] != 0,
+            DualLink: p[DualLinkAt] != 0,
+            HighQuality: p[HighQualityAt] == 1,
+            SpatialAudio: p[SpatialAt] != 0,
+            EqPreset: p[EqAt],
+            Buttons: p.Skip(ButtonsAt).Take(ButtonSlots).Select(b => (int)b).ToArray());
     }
 
     public ProtocolRequest? SetNoise(NoiseSetting desired, HeadsetState? current)
@@ -42,7 +62,36 @@ public sealed class HituneProtocol : IHeadsetProtocol
     }
 
     public ProtocolRequest? SetGameMode(bool enabled) =>
-        new(HituneFrames.Build(HituneCommand.GameMode, [(byte)(enabled ? 1 : 0)]), IsReplyTo(HituneCommand.GameMode));
+        new(HituneFrames.Build(HituneCommand.GameMode, [(byte)(enabled ? 1 : 0)]), IsReplyTo(HituneCommand.GameMode),
+            WasAccepted, enabled ? RefusedByHiRes : null);
+
+    public ProtocolRequest? SetDualLink(bool enabled) =>
+        new(HituneFrames.Build(HituneCommand.DualLink, [(byte)(enabled ? 1 : 0)]), IsReplyTo(HituneCommand.DualLink),
+            WasAccepted, enabled ? RefusedByHiRes : null);
+
+    public ProtocolRequest? SetHighQuality(bool enabled) =>
+        new(HituneFrames.Build(HituneCommand.HighQuality, [(byte)(enabled ? 1 : 0)]), IsReplyTo(HituneCommand.HighQuality));
+
+    public ProtocolRequest? SetSpatialAudio(bool enabled) =>
+        new(HituneFrames.Build(HituneCommand.SpatialAudio, [(byte)(enabled ? 1 : 0)]), IsReplyTo(HituneCommand.SpatialAudio), WasAccepted);
+
+    public ProtocolRequest? SetEqPreset(int presetId) =>
+        presetId is < 0 or > byte.MaxValue
+            ? null
+            : new(HituneFrames.Build(HituneCommand.Equalizer, [(byte)presetId]), IsReplyTo(HituneCommand.Equalizer), WasAccepted);
+
+    /// <summary>O fone recebe as 8 atribuições de uma vez; as outras 7 saem como estão no último estado lido.</summary>
+    public ProtocolRequest? SetButton(int slot, int functionCode, HeadsetState? current)
+    {
+        if (slot is < 0 or >= ButtonSlots || functionCode is < 0 or > byte.MaxValue)
+            return null;
+        if (current?.Buttons is not { Count: ButtonSlots } known)
+            return null;
+
+        var payload = known.Select(b => (byte)b).ToArray();
+        payload[slot] = (byte)functionCode;
+        return new(HituneFrames.Build(HituneCommand.ButtonSetting, payload), IsReplyTo(HituneCommand.ButtonSetting), WasAccepted);
+    }
 
     public bool IsStateChangeHint(object message) => message is HituneEvent;
 
@@ -69,4 +118,7 @@ public sealed class HituneProtocol : IHeadsetProtocol
 
     private static Func<object, bool> IsReplyTo(byte command) =>
         message => message is HituneReply reply && reply.Command == command;
+
+    /// <summary>Flag 0 na resposta é recusa do fone (quadro curto, ver <see cref="HituneParser.Flush"/>); as confirmações trazem 1.</summary>
+    private static bool WasAccepted(object message) => message is HituneReply { Flag: not 0 };
 }

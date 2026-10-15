@@ -11,6 +11,9 @@ public sealed class HituneParser : IMessageParser
 {
     private const int MaxPayload = 255;
 
+    /// <summary>Cabeçalho (3) + comando + status + 2 bytes finais.</summary>
+    private const int ShortReplyLength = 7;
+
     private readonly List<byte> _buffer = [];
 
     public IReadOnlyList<object> Feed(ReadOnlySpan<byte> data)
@@ -65,6 +68,23 @@ public sealed class HituneParser : IMessageParser
     }
 
     public void Reset() => _buffer.Clear();
+
+    /// <summary>
+    /// Quando o fone recusa um comando, responde com um quadro curto: cabeçalho, comando e mais 3 bytes (7 no total),
+    /// sem o campo de tamanho que <see cref="Feed"/> espera. Visto no modo jogo (<c>08 00 a6 94</c>, onde o byte de
+    /// "tamanho" vale 166) e na ligação dupla (<c>06 01 01 ff</c>), nos dois casos com o Hi-Res ligado. Sem este passo
+    /// o quadro ficaria esperando bytes que nunca vêm, o pedido expiraria e a sessão trataria a conexão como perdida.
+    /// A mensagem sai com <c>Flag</c> 0, que é como o protocolo representa "recusado".
+    /// </summary>
+    public IReadOnlyList<object> Flush()
+    {
+        var messages = new List<object>();
+        if (_buffer.Count >= ShortReplyLength && Matches(0, HituneFrames.RxHeader))
+            messages.Add(new HituneReply(_buffer[3], Flag: 0, []));
+
+        _buffer.Clear();
+        return messages;
+    }
 
     private int IndexOfAnyHeader(int from, out bool isEvent)
     {

@@ -86,6 +86,96 @@ public static class ProfileContract
             }
         });
 
+        Guard(problems, "SetDualLink", () =>
+        {
+            foreach (var enabled in new[] { true, false })
+            {
+                var request = protocol.SetDualLink(enabled);
+                var hasDual = caps.HasFlag(Capabilities.DualLink);
+                if (hasDual && (request is null || request.Frame.Length == 0))
+                    problems.Add($"Declara DualLink mas SetDualLink({enabled}) não monta um quadro.");
+                if (!hasDual && request is not null)
+                    problems.Add("Não declara DualLink mas SetDualLink devolve um pedido.");
+            }
+        });
+
+        Guard(problems, "SetSpatialAudio", () =>
+        {
+            foreach (var enabled in new[] { true, false })
+            {
+                var request = protocol.SetSpatialAudio(enabled);
+                var has = caps.HasFlag(Capabilities.SpatialAudio);
+                if (has && (request is null || request.Frame.Length == 0))
+                    problems.Add($"Declara SpatialAudio mas SetSpatialAudio({enabled}) não monta um quadro.");
+                if (!has && request is not null)
+                    problems.Add("Não declara SpatialAudio mas SetSpatialAudio devolve um pedido.");
+            }
+        });
+
+        Guard(problems, "Equalizador", () =>
+        {
+            var has = caps.HasFlag(Capabilities.Equalizer);
+            var presets = p.EqPresets ?? [];
+            if (has && presets.Count == 0)
+                problems.Add("Declara Equalizer mas não lista nenhum preset em EqPresets.");
+            if (!has && presets.Count != 0)
+                problems.Add("Não declara Equalizer mas lista presets em EqPresets.");
+            if (presets.Select(x => x.Id).Distinct().Count() != presets.Count)
+                problems.Add("EqPresets tem ids repetidos.");
+
+            foreach (var preset in presets)
+            {
+                var request = protocol.SetEqPreset(preset.Id);
+                if (request is null || request.Frame.Length == 0)
+                    problems.Add($"SetEqPreset({preset.Id}) não monta um quadro para um preset declarado.");
+            }
+            if (!has && protocol.SetEqPreset(0) is not null)
+                problems.Add("Não declara Equalizer mas SetEqPreset devolve um pedido.");
+        });
+
+        Guard(problems, "Atalhos dos botões", () =>
+        {
+            var has = caps.HasFlag(Capabilities.ButtonMapping);
+            var gestures = p.ButtonGestures ?? [];
+            var functions = p.ButtonFunctions ?? [];
+            if (has && (gestures.Count == 0 || functions.Count == 0))
+                problems.Add("Declara ButtonMapping mas ButtonGestures ou ButtonFunctions está vazio.");
+            if (!has && (gestures.Count != 0 || functions.Count != 0))
+                problems.Add("Não declara ButtonMapping mas lista gestos ou funções.");
+            if (gestures.Select(x => x.Slot).Distinct().Count() != gestures.Count)
+                problems.Add("ButtonGestures tem posições repetidas.");
+            if (functions.Select(x => x.Code).Distinct().Count() != functions.Count)
+                problems.Add("ButtonFunctions tem códigos repetidos.");
+
+            if (has && gestures.Count > 0 && functions.Count > 0)
+            {
+                // O estado só é conhecido depois de uma leitura. O contrato não sabe quantos gestos o fone guarda,
+                // então tenta os tamanhos que um perfil provavelmente usa; basta um deles produzir um quadro.
+                var minimum = gestures.Max(g => g.Slot) + 1;
+                var builds = new[] { minimum, 4, 8, 16 }.Where(n => n >= minimum).Distinct().Any(n =>
+                {
+                    var known = new HeadsetState(50, null, false, Buttons: new int[n]);
+                    var request = protocol.SetButton(gestures[0].Slot, functions[0].Code, known);
+                    return request is { Frame.Length: > 0 };
+                });
+                if (!builds)
+                    problems.Add("Declara ButtonMapping mas SetButton não monta um quadro com um estado de 4, 8 ou 16 gestos conhecidos.");
+            }
+        });
+
+        Guard(problems, "SetHighQuality", () =>
+        {
+            foreach (var enabled in new[] { true, false })
+            {
+                var request = protocol.SetHighQuality(enabled);
+                var hasHq = caps.HasFlag(Capabilities.HighQuality);
+                if (hasHq && (request is null || request.Frame.Length == 0))
+                    problems.Add($"Declara HighQuality mas SetHighQuality({enabled}) não monta um quadro.");
+                if (!hasHq && request is not null)
+                    problems.Add("Não declara HighQuality mas SetHighQuality devolve um pedido.");
+            }
+        });
+
         Guard(problems, "Parser", () =>
         {
             var parser = protocol.CreateParser();

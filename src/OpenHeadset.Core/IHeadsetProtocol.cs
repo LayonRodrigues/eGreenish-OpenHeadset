@@ -8,12 +8,24 @@ public interface IMessageParser
 
     /// <summary>Descarta bytes parciais (usado ao reconectar).</summary>
     void Reset();
+
+    /// <summary>
+    /// Chamado quando a porta ficou em silêncio com bytes ainda pendentes. Devolve o que der para interpretar deles
+    /// (por exemplo, um quadro curto cujo tamanho o cabeçalho não descreve) e descarta o resto.
+    /// </summary>
+    IReadOnlyList<object> Flush() => [];
 }
 
 /// <summary>Um quadro a enviar e como reconhecer a resposta a ele.</summary>
 /// <param name="Frame">Bytes exatamente como vão para o fone.</param>
 /// <param name="IsReply">Diz se uma mensagem recebida é a resposta a este pedido.</param>
-public sealed record ProtocolRequest(byte[] Frame, Func<object, bool> IsReply);
+/// <param name="IsAccepted">Diz se a resposta significa "aceito". Nulo: qualquer resposta conta como aceita.</param>
+/// <param name="RefusedMessage">Texto para o usuário quando o fone recusa, se o perfil sabe o motivo. Nulo: mensagem genérica.</param>
+public sealed record ProtocolRequest(
+    byte[] Frame,
+    Func<object, bool> IsReply,
+    Func<object, bool>? IsAccepted = null,
+    string? RefusedMessage = null);
 
 /// <summary>
 /// O protocolo de um fone. É aqui que mora tudo o que é específico de modelo: formato dos quadros, comandos,
@@ -38,6 +50,25 @@ public interface IHeadsetProtocol
 
     /// <summary>Pedido para ligar ou desligar o modo jogo, ou nulo se o perfil não suporta.</summary>
     ProtocolRequest? SetGameMode(bool enabled);
+
+    /// <summary>Pedido para ligar ou desligar a ligação dupla (conexão simultânea a dois aparelhos), ou nulo se o perfil não suporta.</summary>
+    ProtocolRequest? SetDualLink(bool enabled) => null;
+
+    /// <summary>Pedido para ligar ou desligar a decodificação de alta qualidade (Hi-Res), ou nulo se o perfil não suporta.</summary>
+    ProtocolRequest? SetHighQuality(bool enabled) => null;
+
+    /// <summary>Pedido para ligar ou desligar o áudio espacial, ou nulo se o perfil não suporta.</summary>
+    ProtocolRequest? SetSpatialAudio(bool enabled) => null;
+
+    /// <summary>Pedido para escolher um preset de equalizador (<see cref="EqPreset.Id"/>), ou nulo se o perfil não suporta.</summary>
+    ProtocolRequest? SetEqPreset(int presetId) => null;
+
+    /// <summary>
+    /// Pedido para atribuir <paramref name="functionCode"/> ao gesto <paramref name="slot"/>, ou nulo se o perfil não suporta
+    /// ou se o estado atual dos botões não é conhecido. Fones que mandam todas as atribuições de uma vez usam
+    /// <paramref name="current"/> para não alterar os outros gestos.
+    /// </summary>
+    ProtocolRequest? SetButton(int slot, int functionCode, HeadsetState? current) => null;
 
     /// <summary>Verdadeiro se a mensagem é um aviso espontâneo do fone que indica que o estado mudou.</summary>
     bool IsStateChangeHint(object message);

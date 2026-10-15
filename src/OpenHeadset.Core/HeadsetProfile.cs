@@ -22,6 +22,9 @@ public sealed record SerialSettings(
 /// <param name="NoiseLevels">Níveis de cancelamento, em ordem de exibição. Vazio se o fone não tem níveis.</param>
 /// <param name="Serial">Parâmetros da porta serial.</param>
 /// <param name="CreateProtocol">Cria o protocolo (uma instância por conexão).</param>
+/// <param name="EqPresets">Presets de equalizador, em ordem de exibição. Só vale com <see cref="Capabilities.Equalizer"/>.</param>
+/// <param name="ButtonGestures">Gestos configuráveis, em ordem de exibição. Só vale com <see cref="Capabilities.ButtonMapping"/>.</param>
+/// <param name="ButtonFunctions">Funções que se pode atribuir a um gesto. Só vale com <see cref="Capabilities.ButtonMapping"/>.</param>
 public sealed record HeadsetProfile(
     string Id,
     string DisplayName,
@@ -30,7 +33,10 @@ public sealed record HeadsetProfile(
     IReadOnlyList<NoiseMode> NoiseModes,
     IReadOnlyList<NoiseLevel> NoiseLevels,
     SerialSettings Serial,
-    Func<IHeadsetProtocol> CreateProtocol)
+    Func<IHeadsetProtocol> CreateProtocol,
+    IReadOnlyList<EqPreset>? EqPresets = null,
+    IReadOnlyList<ButtonGesture>? ButtonGestures = null,
+    IReadOnlyList<ButtonFunction>? ButtonFunctions = null)
 {
     public bool Matches(string bluetoothName) =>
         NameFragments.Any(f => bluetoothName.Contains(f, StringComparison.OrdinalIgnoreCase));
